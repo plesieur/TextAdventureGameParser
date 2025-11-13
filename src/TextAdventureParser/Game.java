@@ -4,15 +4,19 @@ import java.util.Scanner;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.Collections;
 
 public class Game {
     private Player player;
     private Scanner scanner;
-    private Map<String, Consumer<String>> commands;
-    // Map to store all rooms, keyed by a unique String ID (e.g., "outside", "cave_entrance")
+    private Map<String, Consumer<List<String>>> commands; // Change signature to accept List<String>
     private Map<String, Room> worldMap;
-    // Map to store all exits, using a custom key like "roomId_direction" -> "destinationRoomId"
     private Map<String, String> exitsMap;
+    private static final List<String> NOISE_WORDS = Arrays.asList("a", "an", "the", "and", "then", "my");
+    private static final List<String> PREPOSITIONS = Arrays.asList("on", "with", "in", "to");
 
 
     public static void main(String[] args) {
@@ -26,45 +30,11 @@ public class Game {
         worldMap = new HashMap<>();
         exitsMap = new HashMap<>();
 
-        initializeCommands();
-        initializeRoomsAndItems();
+        // Use the new Initialize class to set everything up
+        Initialize.initializeCommands(commands, this); // Pass 'this' (the Game instance)
+        String startRoomId = Initialize.initializeRoomsAndItems(worldMap, exitsMap);
         
-        // Start the player in the initial room ID
-        player = new Player(worldMap.get("outside")); 
-    }
-
-    private void initializeCommands() {
-        commands.put("go", this::handleGo);
-        commands.put("take", this::handleTake);
-        commands.put("get", this::handleTake);
-        commands.put("drop", this::handleDrop);
-        commands.put("look", this::handleLook);
-        commands.put("inventory", this::handleInventory);
-        commands.put("i", this::handleInventory);
-    }
-
-    private void initializeRoomsAndItems() {
-        // Define all rooms and add them to the world map
-        Room outside = new Room("You are standing outside a dark cave entrance.");
-        Room caveEntrance = new Room("You are in a dimly lit entrance hall. The air is cold.");
-        Room treasureRoom = new Room("You have found the legendary treasure room! It's full of gold.");
-
-        worldMap.put("outside", outside);
-        worldMap.put("cave_entrance", caveEntrance);
-        worldMap.put("treasure_room", treasureRoom);
-
-        // Define exits using the table-based approach:
-        // Key format: "current_room_id:direction" -> Value: "destination_room_id"
-        exitsMap.put("outside:north", "cave_entrance");
-        exitsMap.put("cave_entrance:south", "outside");
-        exitsMap.put("cave_entrance:north", "treasure_room");
-        exitsMap.put("treasure_room:south", "cave_entrance");
-
-        // Add items to rooms
-        Item key = new Item("key", "A small, rusty iron key.");
-        Item sword = new Item("sword", "A sharp, silver sword.");
-        caveEntrance.addItem(key);
-        treasureRoom.addItem(sword);
+        player = new Player(worldMap.get(startRoomId)); // Use the returned start room ID
     }
 
     public void play() {
@@ -78,61 +48,43 @@ public class Game {
                 System.out.println("Goodbye!");
                 break;
             }
+            // Use the single-command processor, as the multi-noun logic is within parseCommand now
             parseCommand(inputLine);
         }
         scanner.close();
     }
 
-    // ... (parseCommand method is the same as the previous version) ...
+    /**
+     * Parses the user input into a single verb and a list of nouns, then executes the action.
+     */
     public void parseCommand(String input) {
         String cleanInput = input.trim().toLowerCase();
-        String[] parts = cleanInput.split(" ");
-        
-        if (parts.length == 0 || parts[0].isEmpty()) {
+
+        // Remove noise words before splitting into parts
+        List<String> words = Arrays.stream(cleanInput.split(" "))
+                .filter(word -> !NOISE_WORDS.contains(word) && !word.isEmpty())
+                .collect(Collectors.toList());
+
+        if (words.isEmpty()) {
             System.out.println("Please enter a command.");
             return;
         }
 
-        String commandWord = parts[0];
-        String object = (parts.length > 1) ? parts[1] : null;
+        String commandWord = words.get(0);
+        List<String> nouns = words.stream().skip(1).collect(Collectors.toList());
 
-        Consumer<String> action = commands.get(commandWord);
+        // Look up the command in our map
+        Consumer<List<String>> action = commands.get(commandWord);
 
         if (action != null) {
-            action.accept(object);
+            // Execute the associated function, passing the list of nouns
+            action.accept(nouns);
         } else {
             System.out.println("I don't know how to " + commandWord + ".");
         }
     }
 
-
-    // --- Command Handler Methods ---
-
-    private void handleGo(String direction) {
-        if (direction == null) {
-            System.out.println("Go where? (north, south, etc.)");
-            return;
-        }
-
-        // We need the player's current room ID to check the exits map
-        // This requires a minor update to the Player class (adding a getRoomId() method, see below)
-        String currentRoomId = getRoomIdByObject(player.getCurrentRoom());
-        String exitKey = currentRoomId + ":" + direction;
-
-        if (exitsMap.containsKey(exitKey)) {
-            String destinationRoomId = exitsMap.get(exitKey);
-            Room destinationRoom = worldMap.get(destinationRoomId);
-            
-            if (destinationRoom != null) {
-                player.setCurrentRoom(destinationRoom); // Player needs a setCurrentRoom method too
-                printLocationInfo();
-            } else {
-                System.out.println("Error: destination room not found in map data.");
-            }
-        } else {
-            System.out.println("You can't go that way!");
-        }
-    }
+    // --- Helper and Command Handler Methods ---
 
     // Helper method to find a Room ID by its object reference
     private String getRoomIdByObject(Room targetRoom) {
@@ -141,29 +93,28 @@ public class Game {
                 return entry.getKey();
             }
         }
-        return null; // Should not happen in a working game
+        return null;
     }
     
     // Helper method to print room info and exits from the exits map
     private void printLocationInfo() {
+        // ... (this method remains identical to the previous version) ...
         Room current = player.getCurrentRoom();
         String currentRoomId = getRoomIdByObject(current);
         System.out.println("\n" + current.getDescription());
 
-        // Manually find exits from the exits map
         System.out.print("Exits: ");
         boolean foundExit = false;
         for (String key : exitsMap.keySet()) {
             if (key.startsWith(currentRoomId + ":")) {
-                String direction = key.split(":")[1];
-                System.out.print(direction + " ");
+                String direction[] = key.split(":");
+                System.out.print(direction[1] + " ");
                 foundExit = true;
             }
         }
         if (!foundExit) System.out.print("none");
         System.out.println();
         
-        // Print items in the room
         System.out.print("Items in the room: ");
         if (current.getItems().isEmpty()) {
             System.out.println("none");
@@ -175,43 +126,144 @@ public class Game {
         }
     }
 
+    // Command Handlers (private, using Consumer<List<String>> signature)
 
-    private void handleTake(String itemName) {
-        if (itemName == null) {
+    // New handler for "use [item] on/with [object]"
+    public void handleUse(List<String> words) {
+        // Expected format: [item] [preposition] [object]
+        if (words.size() < 3) {
+            System.out.println("Use what on what? Try 'use [item] on [object]'.");
+            return;
+        }
+
+        int prepIndex = -1;
+        String preposition = null;
+
+        // Find the index of the preposition (on, with, in)
+        for (int i = 0; i < words.size(); i++) {
+            if (PREPOSITIONS.contains(words.get(i))) {
+                prepIndex = i;
+                preposition = words.get(i);
+                break;
+            }
+        }
+
+        if (prepIndex == -1 || prepIndex == 0 || prepIndex == words.size() - 1) {
+            System.out.println("Please specify a proper preposition and items/objects.");
+            return;
+        }
+
+        // Extract the item name (before the preposition) and the target name (after the preposition)
+        String itemName = String.join(" ", words.subList(0, prepIndex));
+        String targetName = String.join(" ", words.subList(prepIndex + 1, words.size()));
+
+        // Remove noise words from the parsed names
+        itemName = Arrays.stream(itemName.split(" "))
+                .filter(word -> !NOISE_WORDS.contains(word))
+                .collect(Collectors.joining(" "));
+        targetName = Arrays.stream(targetName.split(" "))
+                .filter(word -> !NOISE_WORDS.contains(word))
+                .collect(Collectors.joining(" "));
+
+
+        // 1. Check if the player has the item
+        Item itemInInventory = player.getItemFromInventory(itemName);
+        if (itemInInventory == null) {
+            System.out.println("You don't have the " + itemName + ".");
+            return;
+        }
+
+        // 2. Check if the target object is in the room
+        // For this simple example, we assume the target must be an item in the room. 
+        // A real game would check doors, containers, NPCs, etc.
+        Item targetInRoom = player.getCurrentRoom().getItem(targetName);
+        if (targetInRoom == null) {
+            System.out.println("You don't see a " + targetName + " here.");
+            return;
+        }
+
+        // 3. Implement specific interaction logic (The core mechanic)
+        if (itemName.equals("key") && targetName.equals("sword") && preposition.equals("on")) {
+             System.out.println("You use the key on the sword. Nothing happens.");
+        } else {
+             System.out.println("You use the " + itemName + " " + preposition + " the " + targetName + ". It doesn't work.");
+        }
+    }
+    
+    // handleGo now expects a list of nouns, handles the first one
+    public void handleGo(List<String> directions) {
+        if (directions == null || directions.isEmpty()) {
+            System.out.println("Go where? (north, south, etc.)");
+            return;
+        }
+        String direction = directions.get(0); // Only use the first direction
+
+        String currentRoomId = getRoomIdByObject(player.getCurrentRoom());
+        String exitKey = currentRoomId + ":" + direction;
+
+        if (exitsMap.containsKey(exitKey)) {
+            String destinationRoomId = exitsMap.get(exitKey);
+            Room destinationRoom = worldMap.get(destinationRoomId);
+            
+            if (destinationRoom != null) {
+                player.setCurrentRoom(destinationRoom); 
+                printLocationInfo();
+            } else {
+                System.out.println("Error: destination room not found in map data.");
+            }
+        } else {
+            System.out.println("You can't go that way!");
+        }
+    }
+
+    // New handler to process multiple items for the "take" verb
+    public void handleTakeMulti(List<String> items) {
+        if (items.isEmpty()) {
             System.out.println("Take what?");
             return;
         }
-        Item itemToTake = player.getCurrentRoom().getItem(itemName);
-        if (itemToTake != null) {
-            player.getCurrentRoom().removeItem(itemToTake);
-            player.addItem(itemToTake);
-            System.out.println("You take the " + itemName + ".");
-        } else {
-            System.out.println("There is no " + itemName + " here.");
+        for (String itemName : items) {
+            Item itemToTake = player.getCurrentRoom().getItem(itemName);
+            if (itemToTake != null) {
+                player.getCurrentRoom().removeItem(itemToTake);
+                player.addItem(itemToTake);
+                System.out.println("You take the " + itemName + ".");
+            } else {
+                System.out.println("There is no " + itemName + " here.");
+            }
         }
     }
-
-    private void handleDrop(String itemName) {
-        if (itemName == null) {
+    
+    // New handler to process multiple items for the "drop" verb
+    public void handleDropMulti(List<String> items) {
+         if (items.isEmpty()) {
             System.out.println("Drop what?");
             return;
         }
-
-        Item itemToDrop = player.getItemFromInventory(itemName);
-        if (itemToDrop != null) {
-            player.removeItem(itemToDrop);
-            player.getCurrentRoom().addItem(itemToDrop);
-            System.out.println("You drop the " + itemName + ".");
-        } else {
-            System.out.println("You don't have a " + itemName + " in your inventory.");
+        for (String itemName : items) {
+            Item itemToDrop = player.getItemFromInventory(itemName);
+            if (itemToDrop != null) {
+                player.removeItem(itemToDrop);
+                player.getCurrentRoom().addItem(itemToDrop);
+                System.out.println("You drop the " + itemName + ".");
+            } else {
+                System.out.println("You don't have a " + itemName + " in your inventory.");
+            }
         }
     }
 
-    private void handleLook(String object) {
-        printLocationInfo();
+    // handleLook now expects a list of nouns
+    public void handleLook(List<String> objects) {
+        if (objects == null || objects.isEmpty()) {
+             printLocationInfo();
+        } else {
+            // A more advanced game would implement looking at specific objects here
+            System.out.println("You look closely at the " + String.join(" ", objects) + ".");
+        }
     }
 
-    private void handleInventory(String object) {
+    // handleInventory is still simple
+    public void handleInventory(List<String> dummyHolder) {
         System.out.println(player.getInventoryDescription());
     }
 }
