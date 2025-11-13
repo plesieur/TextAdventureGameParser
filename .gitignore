@@ -1,16 +1,20 @@
-# Compiled class files
+# ==========================
+# Java + Eclipse + Maven + Gradle
+# ==========================
+
+####################
+# Java build files #
+####################
 *.class
-
-# Log files
 *.log
-
-# BlueJ files
 *.ctxt
+hs_err_pid*
+replay_pid*
+*.pid
 
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
-
-# Package Files #
+####################
+# Package Archives #
+####################
 *.jar
 *.war
 *.nar
@@ -19,10 +23,9 @@
 *.tar.gz
 *.rar
 
-# Virtual machine crash logs
-hs_err_pid*
-
-# Eclipse project files
+####################
+# Eclipse metadata #
+####################
 .metadata/
 bin/
 tmp/
@@ -36,35 +39,83 @@ local.properties
 .project
 .classpath
 .recommenders/
-
-# Eclipse Core
 .remote/
 
-# JDT-specific (Java Development Tools)
-.classpath
-.project
-.settings/
+####################
+# Eclipse Core #
+####################
+# Avoid committing personal or system files
+.eclipse/
+.apt_generated/
+.factorypath
+.checkstyle
+.externalToolBuilders/
+.cproject
+.autotools
+.language.settings.xml
 
-# Build folders
-target/
-build/
-
-# Gradle
-.gradle/
-build/
-
-# Maven
+####################
+# Maven #
+####################
 target/
 pom.xml.tag
 pom.xml.releaseBackup
 pom.xml.versionsBackup
 pom.xml.next
 release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+.mvn/wrapper/maven-wrapper.properties
+# Local Maven repository (optional, uncomment if needed)
+# ~/.m2/
 
-# Java specific
-*.iml
+####################
+# Gradle #
+####################
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+gradle-app.setting
+gradle-app.properties
+
+####################
+# IntelliJ IDEA (if opened there too) #
+####################
 .idea/
+*.iml
+*.ipr
+*.iws
+out/
 
-# OS-specific
+####################
+# OS-specific files #
+####################
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
 Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+.nfs*
+
+####################
+# Miscellaneous #
+####################
+# Logs, temp, backups
+*.log
+*.bak
+*.swp
+*.swo
+
+# Ignore environment files
+.env
