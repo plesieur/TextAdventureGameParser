@@ -1,5 +1,6 @@
 package TextAdventureParser;
 
+
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -26,8 +27,16 @@ public class Initialize {
         commands.put("get", game::handleTakeMulti);  
         commands.put("pickup", game::handleTakeMulti); 
         commands.put("i", game::handleInventory); //Abbreviation
-        commands.put("north", game::handleGo);   //Abbreviation for 'go north'
-        commands.put("n", game::handleGo); // Abbreviation for 'go north'     
+        // Add aliases for directions
+        commands.put("north", nouns -> game.handleGo(Arrays.asList("north")));
+        commands.put("n", nouns -> game.handleGo(Arrays.asList("north")));
+        commands.put("south", nouns -> game.handleGo(Arrays.asList("south")));
+        commands.put("s", nouns -> game.handleGo(Arrays.asList("south")));
+        commands.put("east", nouns -> game.handleGo(Arrays.asList("east")));
+        commands.put("e", nouns -> game.handleGo(Arrays.asList("east")));
+        commands.put("west", nouns -> game.handleGo(Arrays.asList("west")));
+        commands.put("w", nouns -> game.handleGo(Arrays.asList("west")));
+        // You can add more like "up", "down", etc.
     }
 
     /**
@@ -55,9 +64,18 @@ public class Initialize {
         // Add items to rooms
         Item key = new Item("key", "A small, rusty iron key.");
         Item sword = new Item("sword", "A sharp, silver sword.");
+        Item chest = new Item("chest", "A heavy iron chest. It appears to be locked.");
+        Item lantern = new Item("lantern", "A dusty, old lantern.");
+        
+        // Add items to rooms
         caveEntrance.addItem(key);
         treasureRoom.addItem(sword);
-        
+        treasureRoom.addItem(chest);
+
+        // **New Logic:** Link the lantern to the chest for later
+        chest.addItem(lantern);
+        chest.setLocked(true);
+
         return "outside"; // Return the starting room ID
     }
 }

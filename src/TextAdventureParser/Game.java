@@ -4,6 +4,7 @@ import java.util.Scanner;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -130,7 +131,6 @@ public class Game {
 
     // New handler for "use [item] on/with [object]"
     public void handleUse(List<String> words) {
-        // Expected format: [item] [preposition] [object]
         if (words.size() < 3) {
             System.out.println("Use what on what? Try 'use [item] on [object]'.");
             return;
@@ -139,7 +139,6 @@ public class Game {
         int prepIndex = -1;
         String preposition = null;
 
-        // Find the index of the preposition (on, with, in)
         for (int i = 0; i < words.size(); i++) {
             if (PREPOSITIONS.contains(words.get(i))) {
                 prepIndex = i;
@@ -153,11 +152,9 @@ public class Game {
             return;
         }
 
-        // Extract the item name (before the preposition) and the target name (after the preposition)
         String itemName = String.join(" ", words.subList(0, prepIndex));
         String targetName = String.join(" ", words.subList(prepIndex + 1, words.size()));
 
-        // Remove noise words from the parsed names
         itemName = Arrays.stream(itemName.split(" "))
                 .filter(word -> !NOISE_WORDS.contains(word))
                 .collect(Collectors.joining(" "));
@@ -165,28 +162,34 @@ public class Game {
                 .filter(word -> !NOISE_WORDS.contains(word))
                 .collect(Collectors.joining(" "));
 
-
-        // 1. Check if the player has the item
         Item itemInInventory = player.getItemFromInventory(itemName);
         if (itemInInventory == null) {
             System.out.println("You don't have the " + itemName + ".");
             return;
         }
 
-        // 2. Check if the target object is in the room
-        // For this simple example, we assume the target must be an item in the room. 
-        // A real game would check doors, containers, NPCs, etc.
         Item targetInRoom = player.getCurrentRoom().getItem(targetName);
         if (targetInRoom == null) {
             System.out.println("You don't see a " + targetName + " here.");
             return;
         }
 
-        // 3. Implement specific interaction logic (The core mechanic)
-        if (itemName.equals("key") && targetName.equals("sword") && preposition.equals("on")) {
-             System.out.println("You use the key on the sword. Nothing happens.");
+        // Specific interaction logic for key and chest
+        if (itemName.equals("key") && targetName.equals("chest") && preposition.equals("on")) {
+            if (targetInRoom.isLocked()) {
+                targetInRoom.setLocked(false);
+                // Move the hidden item (lantern) from the chest's inventory to the room's inventory
+                List<Item> chestContents = new ArrayList<>(targetInRoom.getInventory());
+                for(Item content : chestContents) {
+                    player.getCurrentRoom().addItem(content);
+                    targetInRoom.removeItem(content);
+                }
+                System.out.println("You use the key on the chest. It clicks open! Inside you find a lantern.");
+            } else {
+                System.out.println("The chest is already unlocked.");
+            }
         } else {
-             System.out.println("You use the " + itemName + " " + preposition + " the " + targetName + ". It doesn't work.");
+            System.out.println("You use the " + itemName + " " + preposition + " the " + targetName + ". It doesn't work.");
         }
     }
     
