@@ -219,18 +219,43 @@ public class Game {
         }
     }
 
-    // New handler to process multiple items for the "take" verb
+    // Updated handler to process multiple items for the "take" verb, 
+    // including context-aware single item pickup.
     public void handleTakeMulti(List<String> items) {
+        List<Item> roomItems = player.getCurrentRoom().getItems();
+        boolean autoPickup = false;
+        String autoItemName = null;
+
+        // If the player didn't specify an item name(s) (e.g., just typed "take")
         if (items.isEmpty()) {
-            System.out.println("Take what?");
-            return;
+            if (roomItems.size() == 1) {
+                // Automatically use the name of the only item in the room
+                Item itemToTake = roomItems.get(0);
+                items = Arrays.asList(itemToTake.getName());
+                autoItemName = itemToTake.getName();
+                autoPickup = true;
+            } else if (roomItems.size() > 1) {
+                System.out.println("Take what? There are multiple items here.");
+                return;
+            } else {
+                System.out.println("There is nothing here to take.");
+                return;
+            }
         }
+        
+        // Process the list of items (either user-provided or auto-detected)
         for (String itemName : items) {
             Item itemToTake = player.getCurrentRoom().getItem(itemName);
             if (itemToTake != null) {
                 player.getCurrentRoom().removeItem(itemToTake);
                 player.addItem(itemToTake);
-                System.out.println("You take the " + itemName + ".");
+                
+                // Print a specific message based on whether it was an auto-pickup or user-specified
+                if (autoPickup && itemName.equals(autoItemName)) {
+                    System.out.println("You take the " + itemName + "."); // Generic message now includes the item name
+                } else {
+                    System.out.println("You take the " + itemName + ".");
+                }
             } else {
                 System.out.println("There is no " + itemName + " here.");
             }
