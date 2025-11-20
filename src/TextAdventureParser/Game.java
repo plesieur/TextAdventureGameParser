@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.Collections;
+import java.util.Optional;
 
 public class Game {
     private Player player;
@@ -87,6 +88,28 @@ public class Game {
 
     // --- Helper and Command Handler Methods ---
 
+    // Utility method to find an item by name or any of its aliases
+    private Optional<Item> findItemByNameOrAlias(String nameOrAlias) {
+        // Clean the input name/alias
+        String cleanName = Arrays.stream(nameOrAlias.toLowerCase().split(" "))
+                .filter(word -> !NOISE_WORDS.contains(word) && !word.isEmpty())
+                .collect(Collectors.joining(" "));
+
+        // Check inventory first
+        for (Item item : player.getItemInventoryList()) { // Player needs a getter for the list
+            if (item.getAliases().contains(cleanName)) {
+                return Optional.of(item);
+            }
+        }
+        // Check current room items
+        for (Item item : player.getCurrentRoom().getItems()) {
+            if (item.getAliases().contains(cleanName)) {
+                return Optional.of(item);
+            }
+        }
+        return Optional.empty();
+    }
+
     // Helper method to find a Room ID by its object reference
     private String getRoomIdByObject(Room targetRoom) {
         for (Map.Entry<String, Room> entry : worldMap.entrySet()) {
@@ -129,16 +152,20 @@ public class Game {
 
     // Command Handlers (private, using Consumer<List<String>> signature)
 
-    // New handler for "use [item] on/with [object]"
+    /**
+     * Handles the "use [item] on/with [target]" command structure using robust alias searching.
+     */
     public void handleUse(List<String> words) {
+        // Expected format: [item part 1] [preposition] [target part 2]
         if (words.size() < 3) {
-            System.out.println("Use what on what? Try 'use [item] on [object]'.");
+            System.out.println("Use what on what? Try 'use [item] on [target]'.");
             return;
         }
 
         int prepIndex = -1;
         String preposition = null;
 
+        // Find the index of the preposition (on, with, in, to)
         for (int i = 0; i < words.size(); i++) {
             if (PREPOSITIONS.contains(words.get(i))) {
                 prepIndex = i;
@@ -152,30 +179,34 @@ public class Game {
             return;
         }
 
-        String itemName = String.join(" ", words.subList(0, prepIndex));
-        String targetName = String.join(" ", words.subList(prepIndex + 1, words.size()));
+        // Extract the raw item name part (before the preposition) 
+        // and the raw target name part (after the preposition)
+        String itemAlias = String.join(" ", words.subList(0, prepIndex));
+        String targetAlias = String.join(" ", words.subList(prepIndex + 1, words.size()));
 
-        itemName = Arrays.stream(itemName.split(" "))
-                .filter(word -> !NOISE_WORDS.contains(word))
-                .collect(Collectors.joining(" "));
-        targetName = Arrays.stream(targetName.split(" "))
-                .filter(word -> !NOISE_WORDS.contains(word))
-                .collect(Collectors.joining(" "));
+        // Use the robust helper method to find the actual item objects using the alias strings
+        Optional<Item> itemInInventoryOpt = findItemByNameOrAlias(itemAlias);
+        Optional<Item> targetInRoomOpt = findItemByNameOrAlias(targetAlias);
 
-        Item itemInInventory = player.getItemFromInventory(itemName);
-        if (itemInInventory == null) {
-            System.out.println("You don't have the " + itemName + ".");
+        // 1. Validate the source item is in inventory
+        if (itemInInventoryOpt.isEmpty() || !player.getItemInventoryList().contains(itemInInventoryOpt.get())) {
+            System.out.println("You don't have the " + itemAlias + " in your inventory.");
             return;
         }
+        Item itemInInventory = itemInInventoryOpt.get();
 
-        Item targetInRoom = player.getCurrentRoom().getItem(targetName);
-        if (targetInRoom == null) {
-            System.out.println("You don't see a " + targetName + " here.");
+
+        // 2. Validate the target is in the room
+        if (targetInRoomOpt.isEmpty() || !player.getCurrentRoom().getItems().contains(targetInRoomOpt.get())) {
+            System.out.println("You don't see a " + targetAlias + " here to use the " + itemInInventory.getName() + " on.");
             return;
         }
+        Item targetInRoom = targetInRoomOpt.get();
 
-        // Specific interaction logic for key and chest
-        if (itemName.equals("key") && targetName.equals("chest") && preposition.equals("on")) {
+
+        // 3. Implement specific interaction logic (The core mechanic)
+        // Check if the actual item names match "key" and "chest", regardless of the aliases used
+        if (itemInInventory.getName().equals("key") && targetInRoom.getName().equals("chest")) {
             if (targetInRoom.isLocked()) {
                 targetInRoom.setLocked(false);
                 // Move the hidden item (lantern) from the chest's inventory to the room's inventory
@@ -184,12 +215,12 @@ public class Game {
                     player.getCurrentRoom().addItem(content);
                     targetInRoom.removeItem(content);
                 }
-                System.out.println("You use the key on the chest. It clicks open! Inside you find a lantern.");
+                System.out.println("You use the " + itemInInventory.getName() + " on the " + targetInRoom.getName() + ". It clicks open! Inside you find a lantern.");
             } else {
                 System.out.println("The chest is already unlocked.");
             }
         } else {
-            System.out.println("You use the " + itemName + " " + preposition + " the " + targetName + ". It doesn't work.");
+             System.out.println("You use the " + itemInInventory.getName() + " " + preposition + " the " + targetInRoom.getName() + ". It doesn't work.");
         }
     }
     
@@ -244,50 +275,70 @@ public class Game {
         }
         
         // Process the list of items (either user-provided or auto-detected)
-        for (String itemName : items) {
-            Item itemToTake = player.getCurrentRoom().getItem(itemName);
-            if (itemToTake != null) {
-                player.getCurrentRoom().removeItem(itemToTake);
-                player.addItem(itemToTake);
-                
-                // Print a specific message based on whether it was an auto-pickup or user-specified
-                if (autoPickup && itemName.equals(autoItemName)) {
-                    System.out.println("You take the " + itemName + "."); // Generic message now includes the item name
+        for (String itemNameOrAlias : items) {
+            Optional<Item> itemOpt = findItemByNameOrAlias(itemNameOrAlias);
+            if (itemOpt.isPresent()) {
+                Item itemToTake = itemOpt.get();
+                // Ensure the item is actually in the room before taking it
+                if(player.getCurrentRoom().getItems().contains(itemToTake)) {
+                    player.getCurrentRoom().removeItem(itemToTake);
+                    player.addItem(itemToTake);
+                    System.out.println("You take the " + itemToTake.getName() + ".");
                 } else {
-                    System.out.println("You take the " + itemName + ".");
+                     System.out.println("The " + itemToTake.getName() + " is not here.");
                 }
             } else {
-                System.out.println("There is no " + itemName + " here.");
+                System.out.println("There is no such item: " + itemNameOrAlias + ".");
             }
         }
     }
     
     // New handler to process multiple items for the "drop" verb
     public void handleDropMulti(List<String> items) {
-         if (items.isEmpty()) {
-            System.out.println("Drop what?");
-            return;
-        }
-        for (String itemName : items) {
-            Item itemToDrop = player.getItemFromInventory(itemName);
-            if (itemToDrop != null) {
+        if (items.isEmpty()) { System.out.println("Drop what?"); return; }
+       for (String itemNameOrAlias : items) {
+            Optional<Item> itemOpt = findItemByNameOrAlias(itemNameOrAlias);
+            if (itemOpt.isPresent() && player.getItemFromInventory(itemOpt.get().getName()) != null) {
+                Item itemToDrop = itemOpt.get();
                 player.removeItem(itemToDrop);
                 player.getCurrentRoom().addItem(itemToDrop);
-                System.out.println("You drop the " + itemName + ".");
+                System.out.println("You drop the " + itemToDrop.getName() + ".");
             } else {
-                System.out.println("You don't have a " + itemName + " in your inventory.");
+                System.out.println("You don't have that in your inventory.");
             }
+       }
+   }
+
+    /**
+     * Handles the 'examine' or 'x' command.
+     */
+    public void handleExamine(List<String> objects) {
+        if (objects.isEmpty()) {
+//            System.out.println(player.getCurrentRoom().getFullDescription()); // If no object specified, look around
+        	printLocationInfo(); // If no object specified, look around
+            return;
+        }
+
+        String targetName = String.join(" ", objects);
+        Optional<Item> itemOpt = findItemByNameOrAlias(targetName);
+
+        if (itemOpt.isPresent()) {
+            Item item = itemOpt.get();
+            System.out.println(item.getDescription());
+            // Optional: print contents if it's an open container
+            if (!item.getInventory().isEmpty() && !item.isLocked()) {
+                 System.out.print("Inside you see: ");
+                 item.getInventory().forEach(i -> System.out.print(i.getName() + " "));
+                 System.out.println();
+            }
+        } else {
+            System.out.println("You see nothing special about that.");
         }
     }
-
+    
     // handleLook now expects a list of nouns
     public void handleLook(List<String> objects) {
-        if (objects == null || objects.isEmpty()) {
-             printLocationInfo();
-        } else {
-            // A more advanced game would implement looking at specific objects here
-            System.out.println("You look closely at the " + String.join(" ", objects) + ".");
-        }
+        handleExamine(objects); // 'look' and 'examine' can share logic now
     }
 
     // handleInventory is still simple

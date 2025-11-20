@@ -2,6 +2,7 @@ package TextAdventureParser;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Collections;
 
 public class Player {
     private Room currentRoom;
@@ -19,6 +20,10 @@ public class Player {
     // New method to set the player's current room
     public void setCurrentRoom(Room newRoom) {
         this.currentRoom = newRoom;
+    }
+
+    public List<Item> getItemInventoryList() {
+        return Collections.unmodifiableList(inventory);
     }
 
     // The move method is now handled entirely within the Game class's handleGo method

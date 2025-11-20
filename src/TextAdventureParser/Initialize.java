@@ -22,11 +22,14 @@ public class Initialize {
         commands.put("look", game::handleLook);
         commands.put("inventory", game::handleInventory);
         commands.put("use", game::handleUse);
+        commands.put("examine", game::handleExamine); // Add examine command
         
         //examples of aliases
         commands.put("get", game::handleTakeMulti);  
         commands.put("pickup", game::handleTakeMulti); 
         commands.put("i", game::handleInventory); //Abbreviation
+        commands.put("x", game::handleExamine); // Alias for examine
+
         // Add aliases for directions
         commands.put("north", nouns -> game.handleGo(Arrays.asList("north")));
         commands.put("n", nouns -> game.handleGo(Arrays.asList("north")));
@@ -62,10 +65,10 @@ public class Initialize {
         exitsMap.put("treasure_room:south", "cave_entrance");
 
         // Add items to rooms
-        Item key = new Item("key", "A small, rusty iron key.");
-        Item sword = new Item("sword", "A sharp, silver sword.");
-        Item chest = new Item("chest", "A heavy iron chest. It appears to be locked.");
-        Item lantern = new Item("lantern", "A dusty, old lantern.");
+        Item key = new Item("key", "A small, rusty iron key.", "rusty key", "small key");
+        Item sword = new Item("sword", "A sharp, silver sword.", "silver sword", "sharp sword");
+        Item chest = new Item("chest", "A heavy iron chest. It appears to be locked.", "iron chest", "heavy chest");
+        Item lantern = new Item("lantern", "A dusty, old lantern.", "dusty lantern");
         
         // Add items to rooms
         caveEntrance.addItem(key);

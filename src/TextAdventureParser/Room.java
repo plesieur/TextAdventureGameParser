@@ -35,4 +35,21 @@ public class Room {
     public String getDescription() { // New getter for description
         return description;
     }
+    
+    /**
+     * Get the full description of the room, including available exits and items.
+     * @return The room description, exits string, and item list.
+     */
+    public String getFullDescription() { 
+        String exitString = "Exits: ";
+        // Logic to build the exit string based on the exits map data (managed in Game.java now)
+        // ... 
+
+        String itemString = "Items in the room: ";
+        // Logic to build the item string based on the items list
+        // ...
+
+        return description + "\n" + exitString + "\n" + itemString;
+    }
+
 }
