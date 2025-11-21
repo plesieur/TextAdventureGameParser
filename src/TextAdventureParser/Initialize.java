@@ -65,16 +65,21 @@ public class Initialize {
         exitsMap.put("treasure_room:south", "cave_entrance");
 
         // Add items to rooms
-        Item key = new Item("key", "A small, rusty iron key.", "rusty key", "small key");
+        // Item(String name, String description, String... aliases)
+        Item rustyKey = new Item("rusty key", "A small, rusty iron key.", "key", "iron key", "small key", "rusty");
+        Item goldenKey = new Item("golden key", "A large, shiny golden key.", "key", "gold key", "shiny key", "golden");
         Item sword = new Item("sword", "A sharp, silver sword.", "silver sword", "sharp sword");
         Item chest = new Item("chest", "A heavy iron chest. It appears to be locked.", "iron chest", "heavy chest");
         Item lantern = new Item("lantern", "A dusty, old lantern.", "dusty lantern");
+        Item shield = new Item("shield", "A sturdy, silver shield", "silver shield", "studry shield");
         
         // Add items to rooms
-        caveEntrance.addItem(key);
+        caveEntrance.addItem(rustyKey);
         treasureRoom.addItem(sword);
         treasureRoom.addItem(chest);
-
+        treasureRoom.addItem(goldenKey);
+        treasureRoom.addItem(shield);
+        
         // **New Logic:** Link the lantern to the chest for later
         chest.addItem(lantern);
         chest.setLocked(true);

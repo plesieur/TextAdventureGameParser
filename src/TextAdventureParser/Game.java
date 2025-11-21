@@ -89,25 +89,52 @@ public class Game {
     // --- Helper and Command Handler Methods ---
 
     // Utility method to find an item by name or any of its aliases
+    // Returns the item wrapped in Optional, or Optional.empty() if no unique match found
     private Optional<Item> findItemByNameOrAlias(String nameOrAlias) {
-        // Clean the input name/alias
-        String cleanName = Arrays.stream(nameOrAlias.toLowerCase().split(" "))
+        // Clean the input name/alias by removing noise words
+        List<String> cleanInputWords = Arrays.stream(nameOrAlias.toLowerCase().split(" "))
                 .filter(word -> !NOISE_WORDS.contains(word) && !word.isEmpty())
-                .collect(Collectors.joining(" "));
+                .collect(Collectors.toList());
 
-        // Check inventory first
-        for (Item item : player.getItemInventoryList()) { // Player needs a getter for the list
-            if (item.getAliases().contains(cleanName)) {
-                return Optional.of(item);
-            }
+        if (cleanInputWords.isEmpty()) {
+            return Optional.empty(); // Cannot search for an empty string
         }
-        // Check current room items
-        for (Item item : player.getCurrentRoom().getItems()) {
-            if (item.getAliases().contains(cleanName)) {
-                return Optional.of(item);
+
+        List<Item> potentialMatches = new ArrayList<>();
+
+        // Helper to check for matches in a given list of items
+        Consumer<List<Item>> checkMatches = (itemList) -> {
+            for (Item item : itemList) {
+                // Check if ALL input words appear in the item's aliases
+                boolean allWordsMatch = true;
+                for (String word : cleanInputWords) {
+                    // Check if any alias for the item contains the current input word
+                    boolean wordFoundInAlias = item.getAliases().stream().anyMatch(alias -> alias.contains(word));
+                    if (!wordFoundInAlias) {
+                        allWordsMatch = false;
+                        break;
+                    }
+                }
+                if (allWordsMatch) {
+                    potentialMatches.add(item);
+                }
             }
+        };
+
+        // Check both inventory and room items
+        checkMatches.accept(player.getItemInventoryList());
+        checkMatches.accept(player.getCurrentRoom().getItems());
+
+        // Handle ambiguity:
+        if (potentialMatches.size() == 1) {
+            return Optional.of(potentialMatches.get(0));
+        } else if (potentialMatches.size() > 1) {
+            // Ambiguous input, the calling method must handle this by printing clarification
+            return Optional.empty(); 
+        } else {
+            // No match found
+            return Optional.empty();
         }
-        return Optional.empty();
     }
 
     // Helper method to find a Room ID by its object reference
@@ -122,7 +149,6 @@ public class Game {
     
     // Helper method to print room info and exits from the exits map
     private void printLocationInfo() {
-        // ... (this method remains identical to the previous version) ...
         Room current = player.getCurrentRoom();
         String currentRoomId = getRoomIdByObject(current);
         System.out.println("\n" + current.getDescription());
@@ -190,7 +216,7 @@ public class Game {
 
         // 1. Validate the source item is in inventory
         if (itemInInventoryOpt.isEmpty() || !player.getItemInventoryList().contains(itemInInventoryOpt.get())) {
-            System.out.println("You don't have the " + itemAlias + " in your inventory.");
+            handleAmbiguityOrNoMatch(itemAlias);
             return;
         }
         Item itemInInventory = itemInInventoryOpt.get();
@@ -198,7 +224,7 @@ public class Game {
 
         // 2. Validate the target is in the room
         if (targetInRoomOpt.isEmpty() || !player.getCurrentRoom().getItems().contains(targetInRoomOpt.get())) {
-            System.out.println("You don't see a " + targetAlias + " here to use the " + itemInInventory.getName() + " on.");
+            handleAmbiguityOrNoMatch(targetAlias);
             return;
         }
         Item targetInRoom = targetInRoomOpt.get();
@@ -206,7 +232,7 @@ public class Game {
 
         // 3. Implement specific interaction logic (The core mechanic)
         // Check if the actual item names match "key" and "chest", regardless of the aliases used
-        if (itemInInventory.getName().equals("key") && targetInRoom.getName().equals("chest")) {
+        if (itemInInventory.getName().equals("rusty key") && targetInRoom.getName().equals("chest")) {
             if (targetInRoom.isLocked()) {
                 targetInRoom.setLocked(false);
                 // Move the hidden item (lantern) from the chest's inventory to the room's inventory
@@ -223,6 +249,8 @@ public class Game {
              System.out.println("You use the " + itemInInventory.getName() + " " + preposition + " the " + targetInRoom.getName() + ". It doesn't work.");
         }
     }
+
+
     
     // handleGo now expects a list of nouns, handles the first one
     public void handleGo(List<String> directions) {
@@ -253,18 +281,17 @@ public class Game {
     // Updated handler to process multiple items for the "take" verb, 
     // including context-aware single item pickup.
     public void handleTakeMulti(List<String> items) {
+        // Create a copy of the list of user-provided item names/aliases
+        List<String> itemsToProcess = new ArrayList<>(items);
         List<Item> roomItems = player.getCurrentRoom().getItems();
-        boolean autoPickup = false;
         String autoItemName = null;
 
         // If the player didn't specify an item name(s) (e.g., just typed "take")
-        if (items.isEmpty()) {
+        if (itemsToProcess.isEmpty()) {
             if (roomItems.size() == 1) {
-                // Automatically use the name of the only item in the room
                 Item itemToTake = roomItems.get(0);
-                items = Arrays.asList(itemToTake.getName());
+                itemsToProcess = Arrays.asList(itemToTake.getName());
                 autoItemName = itemToTake.getName();
-                autoPickup = true;
             } else if (roomItems.size() > 1) {
                 System.out.println("Take what? There are multiple items here.");
                 return;
@@ -274,48 +301,59 @@ public class Game {
             }
         }
         
-        // Process the list of items (either user-provided or auto-detected)
-        for (String itemNameOrAlias : items) {
-            Optional<Item> itemOpt = findItemByNameOrAlias(itemNameOrAlias);
-            if (itemOpt.isPresent()) {
-                Item itemToTake = itemOpt.get();
-                // Ensure the item is actually in the room before taking it
-                if(player.getCurrentRoom().getItems().contains(itemToTake)) {
-                    player.getCurrentRoom().removeItem(itemToTake);
-                    player.addItem(itemToTake);
-                    System.out.println("You take the " + itemToTake.getName() + ".");
-                } else {
-                     System.out.println("The " + itemToTake.getName() + " is not here.");
+        // Process the list of items
+        for (String itemNameOrAlias : itemsToProcess) {
+            Item foundItem = null;
+            // Search specifically within the current room's items using aliases
+            // Use a copy of getItems() to avoid ConcurrentModificationException if we were using a fail-fast iterator
+            List<Item> currentRoomItemsCopy = new ArrayList<>(player.getCurrentRoom().getItems());
+            
+            for (Item item : currentRoomItemsCopy) {
+                // Check if the alias provided by the user matches any of the item's defined aliases
+                if (item.getAliases().stream().anyMatch(alias -> alias.equalsIgnoreCase(itemNameOrAlias))) {
+                    foundItem = item;
+                    break;
                 }
+            }
+
+            if (foundItem != null) {
+                // If found in the room, move it to the player's inventory
+                player.getCurrentRoom().removeItem(foundItem);
+                player.addItem(foundItem);
+                // Use the item's *primary name* for the message
+                System.out.println("You take the " + foundItem.getName() + ".");
             } else {
-                System.out.println("There is no such item: " + itemNameOrAlias + ".");
+                // If the item is no longer found in the room's current list, it might have been taken in 
+                // a previous iteration. Only display an error if it's truly not in the entire game context (ambiguous or missing).
+                if (findItemByNameOrAlias(itemNameOrAlias).isEmpty()) {
+                    handleAmbiguityOrNoMatch(itemNameOrAlias);
+                }
             }
         }
     }
     
     // New handler to process multiple items for the "drop" verb
-    public void handleDropMulti(List<String> items) {
-        if (items.isEmpty()) { System.out.println("Drop what?"); return; }
-       for (String itemNameOrAlias : items) {
-            Optional<Item> itemOpt = findItemByNameOrAlias(itemNameOrAlias);
-            if (itemOpt.isPresent() && player.getItemFromInventory(itemOpt.get().getName()) != null) {
-                Item itemToDrop = itemOpt.get();
-                player.removeItem(itemToDrop);
-                player.getCurrentRoom().addItem(itemToDrop);
-                System.out.println("You drop the " + itemToDrop.getName() + ".");
-            } else {
-                System.out.println("You don't have that in your inventory.");
-            }
-       }
-   }
+	public void handleDropMulti(List<String> items) {
+	    if (items.isEmpty()) { System.out.println("Drop what?"); return; }
+	   for (String itemNameOrAlias : items) {
+	        Optional<Item> itemOpt = findItemByNameOrAlias(itemNameOrAlias);
+	        if (itemOpt.isPresent() && player.getItemFromInventory(itemOpt.get().getName()) != null) {
+	            Item itemToDrop = itemOpt.get();
+	            player.removeItem(itemToDrop);
+	            player.getCurrentRoom().addItem(itemToDrop);
+	            System.out.println("You drop the " + itemToDrop.getName() + ".");
+	        } else {
+	            handleAmbiguityOrNoMatch(itemNameOrAlias); // Use the helper
+	        }
+	   }
+	}
 
     /**
      * Handles the 'examine' or 'x' command.
      */
     public void handleExamine(List<String> objects) {
         if (objects.isEmpty()) {
-//            System.out.println(player.getCurrentRoom().getFullDescription()); // If no object specified, look around
-        	printLocationInfo(); // If no object specified, look around
+        	printLocationInfo(); // Look around the room
             return;
         }
 
@@ -325,14 +363,14 @@ public class Game {
         if (itemOpt.isPresent()) {
             Item item = itemOpt.get();
             System.out.println(item.getDescription());
-            // Optional: print contents if it's an open container
             if (!item.getInventory().isEmpty() && !item.isLocked()) {
                  System.out.print("Inside you see: ");
                  item.getInventory().forEach(i -> System.out.print(i.getName() + " "));
                  System.out.println();
             }
         } else {
-            System.out.println("You see nothing special about that.");
+            // Handle ambiguity or no match
+            handleAmbiguityOrNoMatch(targetName);
         }
     }
     
@@ -345,4 +383,29 @@ public class Game {
     public void handleInventory(List<String> dummyHolder) {
         System.out.println(player.getInventoryDescription());
     }
+    
+    // Helper method to provide better feedback on ambiguous or unknown items
+    private void handleAmbiguityOrNoMatch(String input) {
+        // Re-run the search to determine if it was a total miss or an ambiguous match
+        List<String> cleanInputWords = Arrays.stream(input.toLowerCase().split(" "))
+                .filter(word -> !NOISE_WORDS.contains(word) && !word.isEmpty())
+                .collect(Collectors.toList());
+        
+        List<Item> allAvailableItems = new ArrayList<>();
+        allAvailableItems.addAll(player.getItemInventoryList());
+        allAvailableItems.addAll(player.getCurrentRoom().getItems());
+        
+        List<Item> matches = allAvailableItems.stream().filter(item -> {
+             return cleanInputWords.stream().allMatch(word -> item.getAliases().stream().anyMatch(alias -> alias.contains(word)));
+        }).collect(Collectors.toList());
+
+        if (matches.size() > 1) {
+            System.out.print("Which one did you mean? ");
+            matches.forEach(item -> System.out.print(item.getName() + " or "));
+            System.out.println("?");
+        } else {
+            System.out.println("You don't see any \"" + input + "\" here or in your inventory.");
+        }
+    }
+
 }
