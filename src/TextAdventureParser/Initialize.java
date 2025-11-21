@@ -14,8 +14,12 @@ public class Initialize {
      * @param commands The map to populate.
      * @param game The Game instance to link command actions to.
      */
-    public static void initializeCommands(Map<String, Consumer<List<String>>> commands, Game game) {
+
         // We link the commands back to the methods in the Game class instance
+    public static void initializeCommands(Map<String, Consumer<List<String>>> commands, 
+                   Map<String, String> primaryCommands, // New map parameter
+                   Game game) {
+/*
         commands.put("go", game::handleGo);
         commands.put("take", game::handleTakeMulti); // New multi-noun handler
         commands.put("drop", game::handleDropMulti); // New multi-noun handler
@@ -40,7 +44,46 @@ public class Initialize {
         commands.put("west", nouns -> game.handleGo(Arrays.asList("west")));
         commands.put("w", nouns -> game.handleGo(Arrays.asList("west")));
         // You can add more like "up", "down", etc.
+ */
+        // Define primary commands and their descriptions
+        primaryCommands.put("go", "Move in a direction (e.g., 'go north', 'n')");
+        primaryCommands.put("take", "Pick up an item (e.g., 'take key', 'get all')");
+        primaryCommands.put("drop", "Put down an item from inventory");
+        primaryCommands.put("examine", "Look closely at something (e.g., 'examine chest', 'x key')");
+        primaryCommands.put("look", "Look around the room");
+        primaryCommands.put("inventory", "Check your inventory (or 'i')");
+        primaryCommands.put("use", "Combine items (e.g., 'use key on chest')");
+        primaryCommands.put("help", "Display this help message (or '?')");
+        primaryCommands.put("quit", "Exit the game (or 'exit')");
+
+
+        // Link all aliases back to the primary command handlers in the Game instance
+        commands.put("go", game::handleGo);
+        commands.put("take", game::handleTakeMulti);
+        commands.put("get", game::handleTakeMulti);
+        commands.put("drop", game::handleDropMulti);
+        commands.put("look", game::handleLook);
+        commands.put("examine", game::handleExamine);
+        commands.put("x", game::handleExamine);
+        commands.put("inventory", game::handleInventory);
+        commands.put("i", game::handleInventory);
+        commands.put("use", game::handleUse);
+        commands.put("help", game::handleHelp);
+        commands.put("?", game::handleHelp);
+        commands.put("quit", null); // Handled explicitly in the game loop check
+        commands.put("exit", null); // Handled explicitly in the game loop check
+
+        // Direction aliases (These are technically single-word commands that use the 'go' handler)
+        commands.put("north", nouns -> game.handleGo(Arrays.asList("north")));
+        commands.put("n", nouns -> game.handleGo(Arrays.asList("north")));
+        commands.put("south", nouns -> game.handleGo(Arrays.asList("south")));
+        commands.put("s", nouns -> game.handleGo(Arrays.asList("south")));
+        commands.put("east", nouns -> game.handleGo(Arrays.asList("east")));
+        commands.put("e", nouns -> game.handleGo(Arrays.asList("east")));
+        commands.put("west", nouns -> game.handleGo(Arrays.asList("west")));
+        commands.put("w", nouns -> game.handleGo(Arrays.asList("west")));
     }
+
 
     /**
      * Creates rooms, items, links exits, and returns the starting room ID.

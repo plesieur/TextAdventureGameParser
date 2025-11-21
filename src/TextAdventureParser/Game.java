@@ -14,7 +14,9 @@ import java.util.Optional;
 public class Game {
     private Player player;
     private Scanner scanner;
-    private Map<String, Consumer<List<String>>> commands; // Change signature to accept List<String>
+//    private Map<String, Consumer<List<String>>> commands; // Change signature to accept List<String>
+    private Map<String, Consumer<List<String>>> commands; 
+    private Map<String, String> primaryCommands; // New field for primary commands/descriptions
     private Map<String, Room> worldMap;
     private Map<String, String> exitsMap;
     private static final List<String> NOISE_WORDS = Arrays.asList("a", "an", "the", "and", "then", "my");
@@ -28,12 +30,13 @@ public class Game {
 
     public Game() {
         scanner = new Scanner(System.in);
+        primaryCommands = new HashMap<>(); // Initialize the new map
         commands = new HashMap<>();
         worldMap = new HashMap<>();
         exitsMap = new HashMap<>();
 
         // Use the new Initialize class to set everything up
-        Initialize.initializeCommands(commands, this); // Pass 'this' (the Game instance)
+        Initialize.initializeCommands(commands, primaryCommands, this); // Pass 'this' (the Game instance)
         String startRoomId = Initialize.initializeRoomsAndItems(worldMap, exitsMap);
         
         player = new Player(worldMap.get(startRoomId)); // Use the returned start room ID
@@ -406,6 +409,18 @@ public class Game {
         } else {
             System.out.println("You don't see any \"" + input + "\" here or in your inventory.");
         }
+    }
+
+    /**
+     * Handles the 'help' command, listing available actions from the table.
+     */
+    public void handleHelp(List<String> objects) {
+        System.out.println("\nYou are playing a text adventure game.");
+        System.out.println("Available commands:");
+        // Iterate over the primary commands map to list available options
+        primaryCommands.forEach((command, description) -> {
+            System.out.printf("- %s: %s%n", command, description);
+        });
     }
 
 }
