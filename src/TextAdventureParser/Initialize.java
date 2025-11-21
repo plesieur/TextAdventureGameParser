@@ -27,7 +27,7 @@ public class Initialize {
         //examples of aliases
         commands.put("get", game::handleTakeMulti);  
         commands.put("pickup", game::handleTakeMulti); 
-        commands.put("i", game::handleInventory); //Abbreviation
+        commands.put("i", game::handleInventory); //Abbreviation for inventory
         commands.put("x", game::handleExamine); // Alias for examine
 
         // Add aliases for directions
